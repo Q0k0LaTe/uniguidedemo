@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UniGuide AI | AI对话</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Noto Sans SC', sans-serif;
+            background-color: #f8f9ff;
+        }
+        .chat-container {
+            height: calc(100vh - 160px);
+        }
+        .message {
+            max-width: 80%;
+            animation: fadeIn 0.3s ease-in-out;
+        }
+        .user-message {
+            background-color: #4f46e5;
+            color: white;
+            border-radius: 18px 18px 0 18px;
+        }
+        .ai-message {
+            background-color: #f3f4f6;
+            color: #1f2937;
+            border-radius: 18px 18px 18px 0;
+            line-height: 1.6;
+        }
+        .ai-message h1, .ai-message h2, .ai-message h3 {
+            font-weight: bold;
+            margin: 12px 0 8px 0;
+        }
+        .ai-message h2 {
+            font-size: 1.1em;
+            color: #4f46e5;
+        }
+        .ai-message ul, .ai-message ol {
+            margin: 8px 0;
+            padding-left: 20px;
+        }
+        .ai-message li {
+            margin: 4px 0;
+        }
+        .ai-message strong {
+            font-weight: 600;
+            color: #1f2937;
+        }
+        .ai-message p {
+            margin: 8px 0;
+        }
+        .typing-indicator span {
+            animation: blink 1.4s infinite both;
+        }
+        .typing-indicator span:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+        .typing-indicator span:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+        .message-input {
+            border-radius: 24px;
+            transition: all 0.3s ease;
+        }
+        .message-input:focus {
+            box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.3);
+        }
+        .send-button {
+            transition: all 0.2s ease;
+        }
+        .send-button:hover {
+            transform: scale(1.05);
+        }
+        .send-button:active {
+            transform: scale(0.95);
+        }
+        .send-button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .suggestions button {
+            transition: all 0.2s ease;
+        }
+        .suggestions button:hover {
+            transform: translateY(-2px);
+        }
+        .welcome-container {
+            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+            border-radius: 16px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+        .connection-status {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 500;
+            z-index: 1000;
+        }
+        .connected {
+            background-color: #10b981;
+            color: white;
+        }
+        .disconnected {
+            background-color: #ef4444;
+            color: white;
+        }
+        .connecting {
+            background-color: #f59e0b;
+            color: white;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        @keyframes blink {
+            0% { opacity: 0.2; }
+            20% { opacity: 1; }
+            100% { opacity: 0.2; }
+        }
+        
+        /* 滚动条样式 */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background-color: #d1d5db;
+            border-radius: 3px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background-color: #9ca3af;
+        }
+    </style>
+</head>
+<body class="h-screen flex flex-col">
+    <!-- Connection Status -->
+    <div id="connection-status" class="connection-status connecting">
+        🔄 连接中...
+    </div>
+
+    <!-- 顶部导航 -->
+    <nav class="bg-white shadow-sm py-3 px-4 flex items-center justify-between">
+        <div class="flex items-center">
+            <div class="flex items-center">
+                <svg class="h-8 w-8 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+                </svg>
+                <span class="ml-2 text-blue-600 text-xl font-bold">UniGuide AI</span>
+            </div>
+        </div>
+        <div class="flex items-center">
+            <button id="clear-chat" class="text-gray-600 hover:text-gray-900 mr-4">
+                <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                </svg>
+            </button>
+            <div class="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
+                <span class="text-blue-600 font-bold text-sm">用户</span>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 主要内容区域 -->
+    <div class="flex-1 flex flex-col overflow-hidden">
+        <!-- 聊天区域 -->
+        <div id="chat-container" class="chat-container flex-1 overflow-y-auto p-4 custom-scrollbar">
+            <!-- 欢迎信息 -->
+            <div class="welcome-container text-white p-6 mb-8">
+                <h2 class="text-2xl font-bold mb-3">欢迎使用 UniGuide AI 智能助手</h2>
+                <p class="mb-4">我是您的AI大学推荐顾问，使用先进的智能算法为您提供个性化的大学申请建议。请告诉我您的学术背景、兴趣和目标，我将通过多步骤分析为您匹配最适合的大学。</p>
+                <div class="bg-white bg-opacity-10 p-4 rounded-lg">
+                    <h3 class="font-medium mb-2">🤖 我的AI能力：</h3>
+                    <ul class="space-y-1">
+                        <li class="flex items-start">
+                            <svg class="h-5 w-5 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            <span>智能解析您的学术背景和偏好</span>
+                        </li>
+                        <li class="flex items-start">
+                            <svg class="h-5 w-5 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            <span>多维度匹配算法计算大学适配度</span>
+                        </li>
+                        <li class="flex items-start">
+                            <svg class="h-5 w-5 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            <span>实时生成个性化推荐报告</span>
+                        </li>
+                        <li class="flex items-start">
+                            <svg class="h-5 w-5 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            <span>专业的申请策略和时间规划建议</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+            
+            <!-- 建议问题 -->
+            <div class="suggestions mb-8">
+                <h3 class="text-sm font-medium text-gray-500 mb-3">🚀 开始对话试试：</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <button class="suggestion-btn bg-white border border-gray-200 hover:border-blue-300 p-3 rounded-lg text-left shadow-sm">
+                        <p class="font-medium text-gray-800">我是理科生，GPA 3.8，SAT 1450，对计算机科学感兴趣，帮我推荐适合的大学</p>
+                    </button>
+                    <button class="suggestion-btn bg-white border border-gray-200 hover:border-blue-300 p-3 rounded-lg text-left shadow-sm">
+                        <p class="font-medium text-gray-800">我想申请美国和加拿大的商科专业，预算在每年5万美元以内</p>
+                    </button>
+                    <button class="suggestion-btn bg-white border border-gray-200 hover:border-blue-300 p-3 rounded-lg text-left shadow-sm">
+                        <p class="font-medium text-gray-800">美国大学的申请流程是什么？什么时候开始准备比较合适？</p>
+                    </button>
+                    <button class="suggestion-btn bg-white border border-gray-200 hover:border-blue-300 p-3 rounded-lg text-left shadow-sm">
+                        <p class="font-medium text-gray-800">我的成绩不是很高，有哪些性价比高的大学可以考虑？</p>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- 聊天消息将在这里动态添加 -->
+            <div id="messages" class="space-y-4">
+                <!-- 正在输入指示器 -->
+                <div id="typing-indicator" class="flex justify-start hidden">
+                    <div class="message ai-message p-4">
+                        <div class="typing-indicator flex space-x-1">
+                            <span class="h-2 w-2 bg-gray-500 rounded-full"></span>
+                            <span class="h-2 w-2 bg-gray-500 rounded-full"></span>
+                            <span class="h-2 w-2 bg-gray-500 rounded-full"></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 输入区域 -->
+        <div class="p-4 border-t border-gray-200 bg-white">
+            <div class="relative">
+                <textarea id="message-input" class="message-input w-full border border-gray-300 rounded-lg py-3 px-4 pr-12 focus:outline-none focus:border-blue-500 resize-none" rows="1" placeholder="请详细描述您的情况，比如GPA、SAT成绩、兴趣专业、地理偏好等..." style="min-height: 50px; max-height: 150px;"></textarea>
+                <button id="send-button" class="send-button absolute right-3 bottom-3 bg-blue-600 text-white rounded-full p-2 hover:bg-blue-700 focus:outline-none">
+                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
+                    </svg>
+                </button>
+            </div>
+            <div class="text-xs text-gray-500 mt-2 flex items-center justify-between">
+                <span>按 Enter 发送，Shift + Enter 换行 | 🤖 AI智能分析中...</span>
+                <span id="message-count" class="text-gray-400">0 条消息</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // WebSocket connection
+        let ws = null;
+        let messageCount = 0;
+        
+        // DOM elements
+        const messageInput = document.getElementById('message-input');
+        const sendButton = document.getElementById('send-button');
+        const messagesContainer = document.getElementById('messages');
+        const typingIndicator = document.getElementById('typing-indicator');
+        const chatContainer = document.getElementById('chat-container');
+        const suggestionBtns = document.querySelectorAll('.suggestion-btn');
+        const connectionStatus = document.getElementById('connection-status');
+        const messageCountEl = document.getElementById('message-count');
+        const clearChatBtn = document.getElementById('clear-chat');
+        
+        // Initialize WebSocket connection
+        function initWebSocket() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}/ws`;
+            
+            ws = new WebSocket(wsUrl);
+            
+            ws.onopen = function(event) {
+                console.log('WebSocket连接已建立');
+                updateConnectionStatus('connected');
+            };
+            
+            ws.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+                if (data.type === 'ai_response') {
+                    handleAIResponse(data.message);
+                }
+            };
+            
+            ws.onclose = function(event) {
+                console.log('WebSocket连接已关闭');
+                updateConnectionStatus('disconnected');
+                // 尝试重连
+                setTimeout(initWebSocket, 3000);
+            };
+            
+            ws.onerror = function(error) {
+                console.error('WebSocket错误:', error);
+                updateConnectionStatus('disconnected');
+            };
+        }
+        
+        // Update connection status
+        function updateConnectionStatus(status) {
+            const statusEl = connectionStatus;
+            statusEl.className = `connection-status ${status}`;
+            
+            switch(status) {
+                case 'connected':
+                    statusEl.textContent = '🟢 已连接';
+                    sendButton.disabled = false;
+                    break;
+                case 'disconnected':
+                    statusEl.textContent = '🔴 连接断开';
+                    sendButton.disabled = true;
+                    break;
+                case 'connecting':
+                    statusEl.textContent = '🔄 连接中...';
+                    sendButton.disabled = true;
+                    break;
+            }
+        }
+        
+        // Handle AI response
+        function handleAIResponse(message) {
+            // Hide typing indicator
+            typingIndicator.classList.add('hidden');
+            
+            // Create AI message element
+            const aiMessageDiv = document.createElement('div');
+            aiMessageDiv.className = 'flex justify-start';
+            
+            // Convert markdown to HTML
+            const htmlContent = marked.parse(message);
+            
+            aiMessageDiv.innerHTML = `
+                <div class="message ai-message p-4">
+                    ${htmlContent}
+                </div>
+            `;
+            
+            messagesContainer.appendChild(aiMessageDiv);
+            scrollToBottom();
+            
+            // Re-enable send button
+            sendButton.disabled = false;
+            messageInput.disabled = false;
+        }
+        
+        // Auto-resize textarea
+        messageInput.addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = (this.scrollHeight) + 'px';
+        });
+        
+        // Send message function
+        function sendMessage() {
+            const message = messageInput.value.trim();
+            if (!message || !ws || ws.readyState !== WebSocket.OPEN) {
+                return;
+            }
+            
+            // Add user message to chat
+            addUserMessage(message);
+            
+            // Send to server
+            ws.send(JSON.stringify({
+                message: message
+            }));
+            
+            // Clear input and reset height
+            messageInput.value = '';
+            messageInput.style.height = 'auto';
+            
+            // Show typing indicator
+            typingIndicator.classList.remove('hidden');
+            scrollToBottom();
+            
+            // Disable send button while processing
+            sendButton.disabled = true;
+            messageInput.disabled = true;
+            
+            // Update message count
+            messageCount += 2; // User + AI message
+            updateMessageCount();
+        }
+        
+        // Add user message to chat
+        function addUserMessage(message) {
+            const userMessageDiv = document.createElement('div');
+            userMessageDiv.className = 'flex justify-end';
+            userMessageDiv.innerHTML = `
+                <div class="message user-message p-4">
+                    <p>${escapeHtml(message)}</p>
+                </div>
+            `;
+            messagesContainer.appendChild(userMessageDiv);
+            scrollToBottom();
+        }
+        
+        // Escape HTML to prevent XSS
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        // Scroll to bottom of chat
+        function scrollToBottom() {
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+        
+        // Update message count
+        function updateMessageCount() {
+            messageCountEl.textContent = `${messageCount} 条消息`;
+        }
+        
+        // Event listeners
+        sendButton.addEventListener('click', sendMessage);
+        
+        messageInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+        
+        // Handle suggestion buttons
+        suggestionBtns.forEach(btn => {
+            btn.addEventListener('click', function() {
+                const question = this.querySelector('p').textContent;
+                messageInput.value = question;
+                messageInput.style.height = 'auto';
+                messageInput.style.height = (messageInput.scrollHeight) + 'px';
+                sendMessage();
+            });
+        });
+        
+        // Clear chat
+        clearChatBtn.addEventListener('click', function() {
+            if (confirm('确定要清空所有对话吗？')) {
+                // Keep only welcome message and suggestions
+                const welcomeContainer = document.querySelector('.welcome-container').parentElement;
+                const suggestionsContainer = document.querySelector('.suggestions');
+                
+                messagesContainer.innerHTML = '';
+                messagesContainer.appendChild(welcomeContainer);
+                messagesContainer.appendChild(suggestionsContainer);
+                
+                messageCount = 0;
+                updateMessageCount();
+                
+                // Hide typing indicator
+                typingIndicator.classList.add('hidden');
+            }
+        });
+        
+        // Initialize connection on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            updateConnectionStatus('connecting');
+            initWebSocket();
+        });
+        
+        // Handle page visibility change to reconnect if needed
+        document.addEventListener('visibilitychange', function() {
+            if (!document.hidden && (!ws || ws.readyState === WebSocket.CLOSED)) {
+                initWebSocket();
+            }
+        });
+    </script>
+</body>
+</html>
