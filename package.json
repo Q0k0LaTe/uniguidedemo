@@ -11,7 +11,10 @@
     "express": "^4.17.1",
     "ws": "^8.5.0",
     "openai": "^4.0.0",
-    "dotenv": "^16.0.0"
+    "dotenv": "^16.0.0",
+    "marked": "^11.1.0",
+    "node-fetch": "^2.7.0",
+    "https-proxy-agent": "^7.0.2"
   },
   "devDependencies": {
     "nodemon": "^2.0.15"
